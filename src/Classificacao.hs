@@ -1,7 +1,7 @@
 module Camada2 where
 
 import Camada1
-import Data.List (sortBy)
+import Data.List (sortBy, maximumBy)
 import Data.Ord (comparing, Down (..))
 
 --Pontos de cada resultado
@@ -66,3 +66,26 @@ classificacao partidas =
       <> comparing (Down . saldo)
       <> comparing (Down . golsPro)
       <> comparing time
+
+--Partidas até a rodada n
+ateRodada :: Int -> [Partida] -> [Partida]
+ateRodada n = filter ((<= n) . rodada)
+
+--Diferença de gols
+diferencaGols :: Partida -> Int
+diferencaGols p = abs (golsMandante p - golsVisitante p)
+
+--Total de gols
+totalGols :: Partida -> Int
+totalGols p = golsMandante p + golsVisitante p
+
+--Maior goleada
+maiorGoleada :: [Partida] -> Maybe Partida
+maiorGoleada []       = Nothing
+maiorGoleada partidas = Just (maximumBy (comparing diferencaGols) partidas)
+
+--Média de gols
+mediaGols :: [Partida] -> Maybe Double
+mediaGols []       = Nothing
+mediaGols partidas =
+  Just (fromIntegral (sum (map totalGols partidas)) / fromIntegral (length partidas))
