@@ -4,28 +4,28 @@ import Data.List (nub, sort)
 
 type Time = String
 
-dataResultado = Vitoria | Empate | Derrota
-deriving (Show, eq)
+data Resultado = Vitoria | Empate | Derrota
+  deriving (Show, Eq)
 
-dataPartida = Partida
-{ rodada          :: Int
-, mandante        :: Time
-, golsMandante    :: Int
-, golsVisitante   :: Int
-, visitante       :: Time
-} deriving (Show, eq)
+data Partida = Partida
+  { rodada        :: Int
+  , mandante      :: Time
+  , golsMandante  :: Int
+  , golsVisitante :: Int
+  , visitante     :: Time
+  } deriving (Show, Eq)
 
-dataLinha = Linha
-{ time        :: Time
-, jogos       :: Int
-, vitorias    :: Int
-, empates     :: Int
-, derrotas    :: Int
-, golsPro     :: Int
-, golsContra  :: Int
-} deriving (Show, eq)
+data Linha = Linha
+  { time       :: Time
+  , jogos      :: Int
+  , vitorias   :: Int
+  , empates    :: Int
+  , derrotas   :: Int
+  , golsPro    :: Int
+  , golsContra :: Int
+  } deriving (Show, Eq)
 
-participou :: Time -> Partida -> Boll
+participou :: Time -> Partida -> Bool
 participou t (Partida _ mand _ _ vis) = t == mand || t == vis
 
 resultadoPara :: Time -> Partida -> Maybe Resultado
@@ -37,12 +37,11 @@ resultadoPara t (Partida _ mand gm gv vis)
   | t == vis = Just $ case compare gv gm of
       GT -> Vitoria
       EQ -> Empate
-      LT -> Derrota   
+      LT -> Derrota
   | otherwise = Nothing
-      
-times :: [Partida] -> [Time]
-times partidas = sort , nub $ [t | p <- partida, t <- [mandante p, visitante p]]
 
+times :: [Partida] -> [Time]
+times partidas = sort . nub $ [t | p <- partidas, t <- [mandante p, visitante p]]
 campeonatoTeste :: [Partida]
 campeonatoTeste =
   [ -- Rodada 1
