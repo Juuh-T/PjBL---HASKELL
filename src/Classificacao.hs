@@ -1,6 +1,8 @@
 module Camada2 where
 
 import Camada1
+import Data.List (sortBy)
+import Data.Ord (comparing, Down (..))
 
 --Pontos de cada resultado
 pontos :: Resultado -> Int
@@ -52,3 +54,15 @@ linhaDoTime partidas t =
             , golsPro    = golsPro l + gp
             , golsContra = golsContra l + gc
             }
+
+--Tabela ordenada
+classificacao :: [Partida] -> [Linha]
+classificacao partidas =
+  sortBy criterios (map (linhaDoTime partidas) (times partidas))
+  where
+    criterios =
+         comparing (Down . pontosLinha)
+      <> comparing (Down . vitorias)
+      <> comparing (Down . saldo)
+      <> comparing (Down . golsPro)
+      <> comparing time
