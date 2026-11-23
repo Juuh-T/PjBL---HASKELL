@@ -1,6 +1,6 @@
-module Camada2 where
+module Classificacao where
 
-import Camada1
+import Tipos
 import Data.List (sortBy, maximumBy)
 import Data.Ord (comparing, Down (..))
 
