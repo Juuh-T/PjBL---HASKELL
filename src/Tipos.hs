@@ -1,4 +1,4 @@
-module Camada1 where
+module Tipos where
 
 import Data.List (nub, sort)
 
