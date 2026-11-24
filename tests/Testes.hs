@@ -6,7 +6,7 @@
 -- =============================================================
 module Main (main) where
 
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, nub, sort)
 import System.IO (hSetEncoding, stdout, utf8)
 
 import Classificacao
@@ -18,6 +18,75 @@ testar :: (Eq a, Show a) => String -> a -> a -> IO ()
 testar nome obtido esperado
   | obtido == esperado = putStrLn ("OK      " ++ nome)
   | otherwise          = putStrLn ("FALHOU  " ++ nome ++ ": " ++ show obtido)
+
+-- -------------------------------------------------------------
+-- Camada 1: Tipos e Dados do Campeonato
+-- -------------------------------------------------------------
+
+vitoriaMandante, vitoriaVisitante, empateSemGols :: Partida
+vitoriaMandante  = Partida 1 "Coritiba" 2 1 "Athletico"
+vitoriaVisitante = Partida 1 "Coritiba" 0 3 "Athletico"
+empateSemGols    = Partida 1 "Coritiba" 0 0 "Athletico"
+
+semRepeticao :: Eq a => [a] -> Bool
+semRepeticao xs = length xs == length (nub xs)
+
+rodadasDoTeste :: [Int]
+rodadasDoTeste = nub (map rodada campeonatoTeste)
+
+timesDaRodada :: Int -> [Time]
+timesDaRodada r =
+  concatMap (\p -> [mandante p, visitante p])
+            (filter ((== r) . rodada) campeonatoTeste)
+
+testesTipos :: IO ()
+testesTipos = do
+  -- resultadoPara
+  testar "resultadoPara: mandante que venceu"
+    (resultadoPara "Coritiba" vitoriaMandante)  (Just Vitoria)
+  testar "resultadoPara: visitante que perdeu"
+    (resultadoPara "Athletico" vitoriaMandante) (Just Derrota)
+  testar "resultadoPara: time que não jogou dá Nothing"
+    (resultadoPara "Paraná" vitoriaMandante)    Nothing
+
+  testar "resultadoPara: visitante que venceu"
+    (resultadoPara "Athletico" vitoriaVisitante) (Just Vitoria)
+  testar "resultadoPara: mandante que perdeu"
+    (resultadoPara "Coritiba" vitoriaVisitante)  (Just Derrota)
+  testar "resultadoPara: empate para o mandante"
+    (resultadoPara "Coritiba" empateSemGols)     (Just Empate)
+  testar "resultadoPara: empate para o visitante"
+    (resultadoPara "Athletico" empateSemGols)    (Just Empate)
+
+  -- participou
+  testar "participou: mandante"       (participou "Coritiba"  vitoriaMandante) True
+  testar "participou: visitante"      (participou "Athletico" vitoriaMandante) True
+  testar "participou: time que não jogou" (participou "Paraná" vitoriaMandante) False
+
+  -- times
+  testar "times: campeonato de teste"
+    (times campeonatoTeste)
+    [ "Athletico", "Cascavel", "Cianorte", "Coritiba"
+    , "Londrina", "Maringá", "Operário", "Paraná" ]
+  testar "times: sem repetição"       (semRepeticao (times campeonatoTeste)) True
+  testar "times: em ordem alfabética" (times campeonatoTeste == sort (times campeonatoTeste)) True
+  testar "times: campeonato vazio"    (times []) []
+
+-- requisitos do campeonato de teste
+testesCampeonatoTeste :: IO ()
+testesCampeonatoTeste = do
+  testar "campeonato: pelo menos 6 times"
+    (length (times campeonatoTeste) >= 6) True
+  testar "campeonato: pelo menos 5 rodadas"
+    (length rodadasDoTeste >= 5) True
+  testar "campeonato: nenhum time joga duas vezes na mesma rodada"
+    (all (semRepeticao . timesDaRodada) rodadasDoTeste) True
+  testar "campeonato: tem empate em 0 x 0"
+    (any (\p -> golsMandante p == 0 && golsVisitante p == 0) campeonatoTeste) True
+  testar "campeonato: tem vitória por 3 ou mais gols"
+    (any (\p -> abs (golsMandante p - golsVisitante p) >= 3) campeonatoTeste) True
+  testar "campeonato: tem times empatados em pontos no final"
+    (semRepeticao (map pontosLinha (classificacao campeonatoTeste))) False
 
 -- -------------------------------------------------------------
 -- Camada 3: Leitura, Validação e Saída
@@ -154,7 +223,11 @@ testesSaida = do
 main :: IO ()
 main = do
   hSetEncoding stdout utf8
-  putStrLn "--- Camada 3: separar, aparar, linhasUteis ---"
+  putStrLn "--- Camada 1: tipos e consultas básicas ---"
+  testesTipos
+  putStrLn "\n--- Camada 1: campeonato de teste ---"
+  testesCampeonatoTeste
+  putStrLn "\n--- Camada 3: separar, aparar, linhasUteis ---"
   testesSeparar
   putStrLn "\n--- Camada 3: lerPartida (um teste por construtor de Erro) ---"
   testesLerPartida
