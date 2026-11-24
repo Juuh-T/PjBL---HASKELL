@@ -2,7 +2,10 @@
 -- Testes com resultado esperado
 --
 -- Compilar a partir da raiz do projeto:
---   ghc -Wall -isrc -outputdir build -o build/testes tests/Testes.hs
+--   ghc -Wall -isrc -outputdir build/testes -o build/testes/testes tests/Testes.hs
+--
+-- Use um -outputdir diferente do usado para src/Main.hs: os dois
+-- arquivos são "module Main" e um sobrescreveria o Main.o do outro.
 -- =============================================================
 module Main (main) where
 
@@ -87,6 +90,145 @@ testesCampeonatoTeste = do
     (any (\p -> abs (golsMandante p - golsVisitante p) >= 3) campeonatoTeste) True
   testar "campeonato: tem times empatados em pontos no final"
     (semRepeticao (map pontosLinha (classificacao campeonatoTeste))) False
+
+-- -------------------------------------------------------------
+-- Camada 2: Classificação com Funções de Ordem Superior
+-- -------------------------------------------------------------
+
+-- | Tabela final do campeonato de teste, conferida à mão
+-- (campos: time, jogos, vitórias, empates, derrotas, GP, GC).
+classificacaoFinalEsperada :: [Linha]
+classificacaoFinalEsperada =
+  [ Linha "Coritiba"  7 5 2 0 11  2   -- 17 pts, SG +9
+  , Linha "Athletico" 7 3 3 1  9  5   -- 12 pts, 3 V, SG +4
+  , Linha "Cianorte"  7 3 3 1 10  7   -- 12 pts, 3 V, SG +3
+  , Linha "Operário"  7 3 2 2  8  7   -- 11 pts
+  , Linha "Paraná"    7 2 3 2  8  8   --  9 pts
+  , Linha "Maringá"   7 1 3 3  7 10   --  6 pts
+  , Linha "Londrina"  7 1 2 4  5 12   --  5 pts
+  , Linha "Cascavel"  7 0 2 5  4 11   --  2 pts
+  ]
+
+-- | Tabela após a rodada 3, conferida à mão.
+classificacaoRodada3Esperada :: [Linha]
+classificacaoRodada3Esperada =
+  [ Linha "Coritiba"  3 2 1 0 4 0   -- 7 pts, 2 V, SG +4
+  , Linha "Cianorte"  3 2 1 0 5 2   -- 7 pts, 2 V, SG +3
+  , Linha "Athletico" 3 1 2 0 3 1   -- 5 pts
+  , Linha "Paraná"    3 1 1 1 5 4   -- 4 pts, 1 V, SG +1
+  , Linha "Operário"  3 1 1 1 4 4   -- 4 pts, 1 V, SG  0
+  , Linha "Londrina"  3 0 2 1 2 5   -- 2 pts
+  , Linha "Cascavel"  3 0 1 2 2 5   -- 1 pt,  SG -3
+  , Linha "Maringá"   3 0 1 2 2 6   -- 1 pt,  SG -4
+  ]
+
+-- | A e B terminam com 3 pontos. A tem 1 vitória e saldo -2;
+-- B tem 0 vitórias e saldo 0. Se o saldo viesse antes, B ficaria
+-- à frente: A só passa porque vitórias é o 2º critério.
+desempateVitorias :: [Partida]
+desempateVitorias =
+  [ Partida 1 "A" 1 0 "X"
+  , Partida 1 "B" 0 0 "Y"
+  , Partida 2 "Y" 3 0 "A"
+  , Partida 2 "B" 0 0 "X"
+  , Partida 3 "B" 0 0 "Z"
+  ]
+
+-- | A e B: 1 ponto, 0 vitórias, saldo 0; A fez 2 gols e B nenhum,
+-- então gols pró decide. A e X empatam em tudo, inclusive gols pró,
+-- e a ordem alfabética do nome desempata.
+desempateGolsPro :: [Partida]
+desempateGolsPro =
+  [ Partida 1 "X" 2 2 "A"
+  , Partida 1 "B" 0 0 "Y"
+  ]
+
+testesClassificacao :: IO ()
+testesClassificacao = do
+  let coritiba  = linhaDoTime campeonatoTeste "Coritiba"
+      athletico = linhaDoTime campeonatoTeste "Athletico"
+      cianorte  = linhaDoTime campeonatoTeste "Cianorte"
+      semJogos  = linhaDoTime campeonatoTeste "Flamengo"
+
+  -- pontos, linhaDoTime, pontosLinha, saldo, aproveitamento
+  testar "pontos: vitória, empate, derrota"
+    (map pontos [Vitoria, Empate, Derrota]) [3, 1, 0]
+  testar "linhaDoTime: Coritiba"
+    coritiba (Linha "Coritiba" 7 5 2 0 11 2)
+  testar "linhaDoTime: time que não jogou tem linha zerada"
+    semJogos (Linha "Flamengo" 0 0 0 0 0 0)
+  testar "linhaDoTime: campeonato vazio"
+    (linhaDoTime [] "Coritiba") (Linha "Coritiba" 0 0 0 0 0 0)
+  testar "pontosLinha: Coritiba"         (pontosLinha coritiba) 17
+  testar "saldo: Coritiba"               (saldo coritiba) 9
+  testar "saldo: negativo (Cascavel)"
+    (saldo (linhaDoTime campeonatoTeste "Cascavel")) (-7)
+  testar "aproveitamento: Coritiba (17 de 21 pontos = 81,0%)"
+    (round (aproveitamento coritiba * 10) :: Int) 810
+  testar "aproveitamento: 100% com só vitórias"
+    (aproveitamento (linhaDoTime [Partida 1 "A" 1 0 "B"] "A")) 100
+  testar "aproveitamento: time que não jogou dá 0 (sem divisão por zero)"
+    (aproveitamento semJogos) 0
+
+  -- classificacao
+  testar "classificacao: tabela final conferida à mão"
+    (classificacao campeonatoTeste) classificacaoFinalEsperada
+  testar "classificacao: campeonato vazio"
+    (classificacao []) []
+
+  -- desempate no campeonato de teste: Athletico x Cianorte
+  testar "desempate: Athletico e Cianorte com 12 pontos"
+    (pontosLinha athletico, pontosLinha cianorte) (12, 12)
+  testar "desempate: Athletico e Cianorte com 3 vitórias"
+    (vitorias athletico, vitorias cianorte) (3, 3)
+  testar "desempate: saldo diferente (+4 x +3)"
+    (saldo athletico, saldo cianorte) (4, 3)
+  testar "desempate: o SALDO decide, Athletico 2º e Cianorte 3º"
+    (map time (take 2 (drop 1 (classificacao campeonatoTeste))))
+    ["Athletico", "Cianorte"]
+
+  -- desempates isolados, um critério por vez
+  testar "desempate: VITÓRIAS vêm antes do saldo (A à frente de B)"
+    (map time (classificacao desempateVitorias)) ["Y", "A", "B", "Z", "X"]
+  testar "desempate: B tem saldo melhor que A, mas fica atrás"
+    (map saldo (filter ((`elem` ["A", "B"]) . time) (classificacao desempateVitorias)))
+    [-2, 0]
+  testar "desempate: GOLS PRÓ e depois ordem alfabética"
+    (map time (classificacao desempateGolsPro)) ["A", "X", "B", "Y"]
+
+  -- ateRodada
+  testar "ateRodada 3: 12 partidas"
+    (length (ateRodada 3 campeonatoTeste)) 12
+  testar "ateRodada 3: nenhuma partida depois da rodada 3"
+    (all ((<= 3) . rodada) (ateRodada 3 campeonatoTeste)) True
+  testar "ateRodada 0: nenhuma partida"
+    (ateRodada 0 campeonatoTeste) []
+  testar "ateRodada 7: o campeonato inteiro"
+    (ateRodada 7 campeonatoTeste) campeonatoTeste
+  testar "classificacao (ateRodada 3): conferida à mão"
+    (classificacao (ateRodada 3 campeonatoTeste)) classificacaoRodada3Esperada
+  testar "classificacao (ateRodada 3): diferente da final"
+    (classificacao (ateRodada 3 campeonatoTeste) /= classificacao campeonatoTeste) True
+  testar "classificacao (ateRodada 3): Cianorte 2º (no final é 3º)"
+    (map time (take 3 (classificacao (ateRodada 3 campeonatoTeste))))
+    ["Coritiba", "Cianorte", "Athletico"]
+
+  -- estatísticas
+  testar "maiorGoleada []: Nothing"  (maiorGoleada []) Nothing
+  testar "mediaGols []: Nothing"     (mediaGols [])    Nothing
+  testar "maiorGoleada: diferença de 3 gols"
+    (fmap diferencaGols (maiorGoleada campeonatoTeste)) (Just 3)
+  testar "maiorGoleada: é uma das duas goleadas por 3 gols"
+    (maybe False (`elem` [ Partida 1 "Paraná"  3 0 "Londrina"
+                         , Partida 3 "Maringá" 0 3 "Coritiba" ])
+                 (maiorGoleada campeonatoTeste))
+    True
+  testar "maiorGoleada: uma partida só"
+    (maiorGoleada [vitoriaMandante]) (Just vitoriaMandante)
+  testar "mediaGols: 62 gols em 28 partidas"
+    (mediaGols campeonatoTeste) (Just (62 / 28))
+  testar "mediaGols: 3 gols em 2 partidas = 1.5"
+    (mediaGols [vitoriaMandante, empateSemGols]) (Just 1.5)
 
 -- -------------------------------------------------------------
 -- Camada 3: Leitura, Validação e Saída
@@ -227,6 +369,8 @@ main = do
   testesTipos
   putStrLn "\n--- Camada 1: campeonato de teste ---"
   testesCampeonatoTeste
+  putStrLn "\n--- Camada 2: classificação e estatísticas ---"
+  testesClassificacao
   putStrLn "\n--- Camada 3: separar, aparar, linhasUteis ---"
   testesSeparar
   putStrLn "\n--- Camada 3: lerPartida (um teste por construtor de Erro) ---"
